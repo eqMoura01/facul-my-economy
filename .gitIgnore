@@ -1,0 +1,21 @@
+# ignorar arquivos de logs
+*.log
+
+# ignorar arquivos de erro
+*.err
+
+
+# ignorar arquivos de configuração
+*.conf
+
+# ignorar arquivos de configuração
+*.conf
+
+
+# ignora os arquivos desnecessários do node_modules
+node_modules/
+
+# ignora os arquivos desnecessários do .env
+# .env
+
+
