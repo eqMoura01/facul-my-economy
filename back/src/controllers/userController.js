@@ -2,8 +2,8 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
 // Gerar token JWT
-const generateToken = (userId) => {
-  return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
+const generateToken = (email) => {
+  return jwt.sign({ email }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN
   });
 };
@@ -31,7 +31,7 @@ exports.criarUsuario = async (req, res) => {
     });
 
     // Gerar token
-    const token = generateToken(usuario.id);
+    const token = generateToken(usuario.email);
 
     res.status(201).json({
       status: 'sucesso',
@@ -73,7 +73,7 @@ exports.login = async (req, res) => {
     }
 
     // Gerar token
-    const token = generateToken(usuario.id);
+    const token = generateToken(usuario.email);
 
     res.status(200).json({
       status: 'sucesso',
@@ -93,7 +93,7 @@ exports.login = async (req, res) => {
 // Buscar usuário atual
 exports.getMe = async (req, res) => {
   try {
-    const usuario = await User.findByPk(req.usuario.id);
+    const usuario = await User.findByPk(req.usuario.email);
     
     res.status(200).json({
       status: 'sucesso',
@@ -120,7 +120,7 @@ exports.atualizarUsuario = async (req, res) => {
       });
     }
 
-    const usuario = await User.findByPk(req.usuario.id);
+    const usuario = await User.findByPk(req.usuario.email);
     if (!usuario) {
       return res.status(404).json({
         status: 'erro',
@@ -147,7 +147,7 @@ exports.atualizarUsuario = async (req, res) => {
 // Deletar usuário
 exports.deletarUsuario = async (req, res) => {
   try {
-    const usuario = await User.findByPk(req.usuario.id);
+    const usuario = await User.findByPk(req.usuario.email);
     if (!usuario) {
       return res.status(404).json({
         status: 'erro',
