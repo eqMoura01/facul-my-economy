@@ -19,6 +19,7 @@ sequelize.sync({ alter: true })
 
 // Rotas
 app.use('/api/usuarios', require('./routes/userRoutes'));
+app.use('/api/expenses', require('./routes/expenseRoutes'));
 
 // Middleware de erro
 app.use((err, req, res, next) => {
