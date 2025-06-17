@@ -8,8 +8,9 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { expenses } from '../services/api';
+import DatePicker from '../components/DatePicker';
+import { useExpense } from '../contexts/ExpenseContext';
 
 export default function Expenses({ navigation }) {
   const [descricao, setDescricao] = useState('');
@@ -18,6 +19,7 @@ export default function Expenses({ navigation }) {
   const [mesHistoricoSelected, setMesHistoricoSelected] = useState('');
   const [historico, setHistorico] = useState([]);
   const [loading, setLoading] = useState(false);
+  const { triggerRefresh } = useExpense();
 
   const getMesNome = (mesNumero) => {
     const meses = [
@@ -32,7 +34,7 @@ export default function Expenses({ navigation }) {
     const dataAtual = new Date();
     const mesAtual = dataAtual.getMonth() + 1;
     const anoAtual = dataAtual.getFullYear();
-    const mesAtualFormatado = `${getMesNome(mesAtual)}/${anoAtual}`;
+    const mesAtualFormatado = `${mesAtual}-${anoAtual}`;
     setMesSelected(mesAtualFormatado);
     setMesHistoricoSelected(mesAtualFormatado);
     carregarDespesas(mesAtual, anoAtual);
@@ -41,13 +43,8 @@ export default function Expenses({ navigation }) {
   // Carregar despesas quando mudar o mês selecionado no histórico
   useEffect(() => {
     if (mesHistoricoSelected) {
-      const [mes, ano] = mesHistoricoSelected.split('/');
-      const meses = {
-        'Janeiro': 1, 'Fevereiro': 2, 'Março': 3, 'Abril': 4,
-        'Maio': 5, 'Junho': 6, 'Julho': 7, 'Agosto': 8,
-        'Setembro': 9, 'Outubro': 10, 'Novembro': 11, 'Dezembro': 12
-      };
-      carregarDespesas(meses[mes], parseInt(ano));
+      const [mes, ano] = mesHistoricoSelected.split('-').map(Number);
+      carregarDespesas(mes, ano);
     }
   }, [mesHistoricoSelected]);
 
@@ -64,26 +61,6 @@ export default function Expenses({ navigation }) {
     }
   };
 
-  // Gerar lista de meses futuros
-  const getMesesFuturos = () => {
-    const meses = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-    ];
-    const dataAtual = new Date();
-    const mesAtual = dataAtual.getMonth(); // 0-11
-    const anoAtual = dataAtual.getFullYear();
-    
-    let opcoesMeses = [];
-    // Inclui o mês atual e os próximos 11 meses
-    for (let i = 0; i <= 11; i++) {
-      const mes = (mesAtual + i) % 12;
-      const ano = anoAtual + Math.floor((mesAtual + i) / 12);
-      opcoesMeses.push(`${meses[mes]}/${ano}`);
-    }
-    return opcoesMeses;
-  };
-
   const handleSalvar = async () => {
     if (!descricao.trim() || !valor.trim() || !mesSelected) {
       Alert.alert('Erro', 'Por favor, preencha todos os campos');
@@ -93,16 +70,11 @@ export default function Expenses({ navigation }) {
     try {
       setLoading(true);
       const valorNumerico = parseFloat(valor.replace('R$ ', '').replace(',', '.'));
-      const [mes, ano] = mesSelected.split('/');
-      const meses = {
-        'Janeiro': 1, 'Fevereiro': 2, 'Março': 3, 'Abril': 4,
-        'Maio': 5, 'Junho': 6, 'Julho': 7, 'Agosto': 8,
-        'Setembro': 9, 'Outubro': 10, 'Novembro': 11, 'Dezembro': 12
-      };
+      const [mes, ano] = mesSelected.split('-').map(Number);
 
       // Pega o dia atual para manter no mesmo mês
       const dataAtual = new Date();
-      const data = new Date(parseInt(ano), meses[mes] - 1, dataAtual.getDate());
+      const data = new Date(parseInt(ano), mes - 1, dataAtual.getDate());
       
       await expenses.criar({
         descricao: descricao.trim(),
@@ -118,9 +90,12 @@ export default function Expenses({ navigation }) {
 
       // Recarrega as despesas do mês selecionado
       if (mesHistoricoSelected) {
-        const [mesHist, anoHist] = mesHistoricoSelected.split('/');
-        carregarDespesas(meses[mesHist], parseInt(anoHist));
+        const [mesHist, anoHist] = mesHistoricoSelected.split('-').map(Number);
+        carregarDespesas(mesHist, anoHist);
       }
+
+      // Notifica outras telas para atualizar
+      triggerRefresh();
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível salvar a despesa');
       console.error(error);
@@ -174,19 +149,12 @@ export default function Expenses({ navigation }) {
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Mês</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={mesSelected}
-              onValueChange={(itemValue) => setMesSelected(itemValue)}
-              style={styles.picker}
-              dropdownIconColor="#fff"
-            >
-              <Picker.Item label="Selecione um mês" value="" />
-              {getMesesFuturos().map((mes, index) => (
-                <Picker.Item key={index} label={mes} value={mes} />
-              ))}
-            </Picker>
-          </View>
+          <DatePicker
+            selectedDate={mesSelected}
+            onDateChange={setMesSelected}
+            showPastMonths={false}
+            monthsRange={12}
+          />
         </View>
 
         <TouchableOpacity style={styles.saveButton} onPress={handleSalvar}>
@@ -197,17 +165,13 @@ export default function Expenses({ navigation }) {
       <View style={styles.historicoHeader}>
         <Text style={styles.historicoTitle}>Histórico</Text>
         <View style={styles.historicoPickerContainer}>
-          <Picker
-            selectedValue={mesHistoricoSelected}
-            onValueChange={(itemValue) => setMesHistoricoSelected(itemValue)}
-            style={styles.historicoPicker}
-            dropdownIconColor="#fff"
-          >
-            <Picker.Item label="Todos os meses" value="" />
-            {getMesesFuturos().map((mes, index) => (
-              <Picker.Item key={index} label={mes} value={mes} />
-            ))}
-          </Picker>
+          <DatePicker
+            selectedDate={mesHistoricoSelected}
+            onDateChange={setMesHistoricoSelected}
+            showPastMonths={true}
+            monthsRange={12}
+            label="Filtrar por Mês"
+          />
         </View>
       </View>
       
@@ -317,13 +281,6 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
   },
-  pickerContainer: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-  },
-  picker: {
-    height: 50,
-  },
   saveButton: {
     backgroundColor: '#4CAF50',
     padding: 15,
@@ -349,14 +306,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   historicoPickerContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 8,
     flex: 1,
     marginLeft: 10,
-  },
-  historicoPicker: {
-    height: 40,
-    color: '#fff',
   },
   historicoContainer: {
     flex: 1,
@@ -393,13 +344,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   editButton: {
-    padding: 5,
+    backgroundColor: '#4CAF50',
+    padding: 8,
+    borderRadius: 4,
   },
   deleteButton: {
-    padding: 5,
+    backgroundColor: '#FF5252',
+    padding: 8,
+    borderRadius: 4,
   },
   actionButtonText: {
-    fontSize: 20,
+    color: '#fff',
+    fontSize: 12,
   },
   bottomNav: {
     flexDirection: 'row',
@@ -428,9 +384,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   loadingContainer: {
-    padding: 20,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 20,
   },
   loadingText: {
     color: '#fff',
@@ -440,7 +397,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 30,
+    paddingVertical: 40,
   },
   emojiText: {
     fontSize: 50,

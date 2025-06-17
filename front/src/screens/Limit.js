@@ -8,8 +8,8 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { limits, expenses } from '../services/api';
+import DatePicker from '../components/DatePicker';
 
 export default function Limit({ navigation }) {
   const [valor, setValor] = useState('');
@@ -23,7 +23,7 @@ export default function Limit({ navigation }) {
     const dataAtual = new Date();
     const mesAtual = dataAtual.getMonth() + 1;
     const anoAtual = dataAtual.getFullYear();
-    const mesAtualFormatado = `${getMesNome(mesAtual)}/${anoAtual}`;
+    const mesAtualFormatado = `${mesAtual}-${anoAtual}`;
     setMesSelected(mesAtualFormatado);
     setMesConsultaSelected(mesAtualFormatado);
     carregarDados(mesAtual, anoAtual);
@@ -32,13 +32,8 @@ export default function Limit({ navigation }) {
   // Carregar dados quando mudar o mês selecionado na consulta
   useEffect(() => {
     if (mesConsultaSelected) {
-      const [mes, ano] = mesConsultaSelected.split('/');
-      const meses = {
-        'Janeiro': 1, 'Fevereiro': 2, 'Março': 3, 'Abril': 4,
-        'Maio': 5, 'Junho': 6, 'Julho': 7, 'Agosto': 8,
-        'Setembro': 9, 'Outubro': 10, 'Novembro': 11, 'Dezembro': 12
-      };
-      carregarDados(meses[mes], parseInt(ano));
+      const [mes, ano] = mesConsultaSelected.split('-').map(Number);
+      carregarDados(mes, ano);
     }
   }, [mesConsultaSelected]);
 
@@ -72,26 +67,6 @@ export default function Limit({ navigation }) {
     return meses[mesNumero - 1];
   };
 
-  // Gerar lista de meses futuros
-  const getMesesFuturos = () => {
-    const meses = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-    ];
-    const dataAtual = new Date();
-    const mesAtual = dataAtual.getMonth(); // 0-11
-    const anoAtual = dataAtual.getFullYear();
-    
-    let opcoesMeses = [];
-    // Inclui o mês atual e os próximos 11 meses
-    for (let i = 0; i <= 11; i++) {
-      const mes = (mesAtual + i) % 12;
-      const ano = anoAtual + Math.floor((mesAtual + i) / 12);
-      opcoesMeses.push(`${meses[mes]}/${ano}`);
-    }
-    return opcoesMeses;
-  };
-
   const handleSalvar = async () => {
     if (!valor.trim() || !mesSelected) {
       Alert.alert('Erro', 'Por favor, preencha todos os campos');
@@ -101,14 +76,9 @@ export default function Limit({ navigation }) {
     try {
       setLoading(true);
       const valorNumerico = parseFloat(valor.replace('R$ ', '').replace(',', '.'));
-      const [mes, ano] = mesSelected.split('/');
-      const meses = {
-        'Janeiro': 1, 'Fevereiro': 2, 'Março': 3, 'Abril': 4,
-        'Maio': 5, 'Junho': 6, 'Julho': 7, 'Agosto': 8,
-        'Setembro': 9, 'Outubro': 10, 'Novembro': 11, 'Dezembro': 12
-      };
+      const [mes, ano] = mesSelected.split('-').map(Number);
 
-      await limits.definir(meses[mes], parseInt(ano), valorNumerico);
+      await limits.definir(mes, ano, valorNumerico);
       
       Alert.alert('Sucesso', 'Limite salvo com sucesso!');
       setValor('');
@@ -116,8 +86,8 @@ export default function Limit({ navigation }) {
 
       // Recarrega os dados do mês selecionado na consulta
       if (mesConsultaSelected) {
-        const [mesConsulta, anoConsulta] = mesConsultaSelected.split('/');
-        carregarDados(meses[mesConsulta], parseInt(anoConsulta));
+        const [mesConsulta, anoConsulta] = mesConsultaSelected.split('-').map(Number);
+        carregarDados(mesConsulta, anoConsulta);
       }
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível salvar o limite');
@@ -158,19 +128,12 @@ export default function Limit({ navigation }) {
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Mês</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={mesSelected}
-              onValueChange={(itemValue) => setMesSelected(itemValue)}
-              style={styles.picker}
-              dropdownIconColor="#fff"
-            >
-              <Picker.Item label="Selecione um mês" value="" />
-              {getMesesFuturos().map((mes, index) => (
-                <Picker.Item key={index} label={mes} value={mes} />
-              ))}
-            </Picker>
-          </View>
+          <DatePicker
+            selectedDate={mesSelected}
+            onDateChange={setMesSelected}
+            showPastMonths={false}
+            monthsRange={12}
+          />
         </View>
 
         <TouchableOpacity 
@@ -187,19 +150,13 @@ export default function Limit({ navigation }) {
       <Text style={styles.consultaTitle}>Consulta</Text>
       
       <View style={styles.consultaContainer}>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={mesConsultaSelected}
-            onValueChange={(itemValue) => setMesConsultaSelected(itemValue)}
-            style={styles.picker}
-            dropdownIconColor="#fff"
-          >
-            <Picker.Item label="Selecione um mês" value="" />
-            {getMesesFuturos().map((mes, index) => (
-              <Picker.Item key={index} label={mes} value={mes} />
-            ))}
-          </Picker>
-        </View>
+        <DatePicker
+          selectedDate={mesConsultaSelected}
+          onDateChange={setMesConsultaSelected}
+          showPastMonths={true}
+          monthsRange={12}
+          label="Filtrar por Mês"
+        />
 
         <ScrollView style={styles.historicoContainer}>
           {loading ? (
@@ -231,7 +188,7 @@ export default function Limit({ navigation }) {
                   <TouchableOpacity 
                     style={styles.editButton}
                     onPress={() => {
-                      setMesSelected(item.mes);
+                      setMesSelected(item.id);
                       setValor(`R$ ${parseFloat(item.valor).toFixed(2)}`);
                     }}
                   >
@@ -313,19 +270,15 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
   },
-  pickerContainer: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-  },
-  picker: {
-    height: 50,
-  },
   saveButton: {
     backgroundColor: '#4CAF50',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 10,
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
   saveButtonText: {
     color: '#fff',
@@ -367,6 +320,19 @@ const styles = StyleSheet.create({
     color: '#888',
     fontSize: 12,
   },
+  historicoStatus: {
+    fontSize: 12,
+    marginTop: 5,
+  },
+  statusAbaixo: {
+    color: '#4CAF50',
+  },
+  statusAcima: {
+    color: '#FF5252',
+  },
+  statusSemLimite: {
+    color: '#888',
+  },
   historicoAcoes: {
     flexDirection: 'row',
     gap: 10,
@@ -376,15 +342,29 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 4,
   },
-  deleteButton: {
-    backgroundColor: '#FF5252',
-    padding: 8,
-    borderRadius: 4,
-  },
   actionButtonText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  emptyContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    color: '#888',
+    fontSize: 16,
+    textAlign: 'center',
   },
   bottomNav: {
     flexDirection: 'row',
@@ -411,41 +391,5 @@ const styles = StyleSheet.create({
   },
   iconText: {
     fontSize: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  historicoStatus: {
-    color: '#888',
-    fontSize: 12,
-  },
-  statusAbaixo: {
-    color: '#4CAF50',
-  },
-  statusAcima: {
-    color: '#FF5252',
-  },
-  statusSemLimite: {
-    color: '#888',
-  },
-  disabledButton: {
-    backgroundColor: '#ccc',
   },
 }); 

@@ -12,6 +12,9 @@ import {
 import { Picker } from '@react-native-picker/picker';
 import { useNavigation } from '@react-navigation/native';
 import { expenses, auth } from '../services/api';
+import DatePicker from '../components/DatePicker';
+import FinancialProgress from '../components/FinancialProgress';
+import { useExpense } from '../contexts/ExpenseContext';
 
 export default function Home() {
   const [selectedMonth, setSelectedMonth] = useState('');
@@ -20,6 +23,7 @@ export default function Home() {
   const [userData, setUserData] = useState(null);
   const [showPicker, setShowPicker] = useState(false);
   const navigation = useNavigation();
+  const { shouldRefresh } = useExpense();
 
   // Carregar dados do usuário ao iniciar
   useEffect(() => {
@@ -44,13 +48,13 @@ export default function Home() {
     carregarDados(mesAtual, anoAtual);
   }, []);
 
-  // Carregar dados quando mudar o mês selecionado
+  // Carregar dados quando mudar o mês selecionado ou quando houver atualização
   useEffect(() => {
     if (selectedMonth) {
       const [mes, ano] = selectedMonth.split('-').map(Number);
       carregarDados(mes, ano);
     }
-  }, [selectedMonth]);
+  }, [selectedMonth, shouldRefresh]);
 
   const carregarDados = async (mes, ano) => {
     try {
@@ -136,67 +140,15 @@ export default function Home() {
         <Text style={styles.subText}>É bom te ver por aqui!</Text>
       </View>
 
-      {/* Month Selector Button */}
-      <TouchableOpacity 
-        style={styles.monthSelectorButton}
-        onPress={() => setShowPicker(true)}
-      >
-        <Text style={styles.monthSelectorText}>
-          {selectedMonth ? 
-            `${getMesNome(parseInt(selectedMonth.split('-')[0]))}/${selectedMonth.split('-')[1]}` : 
-            'Selecione um mês'}
-        </Text>
-      </TouchableOpacity>
-
-      {/* Month Picker Modal */}
-      <Modal
-        visible={showPicker}
-        transparent={true}
-        animationType="slide"
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.pickerContainer}>
-            <View style={styles.pickerHeader}>
-              <Text style={styles.pickerTitle}>Selecione o Mês</Text>
-              <TouchableOpacity 
-                style={styles.closeButton}
-                onPress={() => setShowPicker(false)}
-              >
-                <Text style={styles.closeButtonText}>Fechar</Text>
-              </TouchableOpacity>
-            </View>
-            <Picker
-              selectedValue={selectedMonth}
-              onValueChange={(itemValue) => {
-                setSelectedMonth(itemValue);
-                setShowPicker(false);
-                if (itemValue) {
-                  const [mes, ano] = itemValue.split('-').map(Number);
-                  carregarDados(mes, ano);
-                }
-              }}
-              style={styles.picker}
-              itemStyle={styles.pickerItem}
-              dropdownIconColor="#333"
-              mode="dropdown"
-            >
-              <Picker.Item 
-                label="Selecione um mês" 
-                value="" 
-                color="#333"
-              />
-              {getMesesComAno().map((item) => (
-                <Picker.Item 
-                  key={item.value} 
-                  label={item.label} 
-                  value={item.value}
-                  color="#333"
-                />
-              ))}
-            </Picker>
-          </View>
-        </View>
-      </Modal>
+      {/* Month Selector */}
+      <View style={styles.monthSelectorContainer}>
+        <DatePicker
+          selectedDate={selectedMonth}
+          onDateChange={setSelectedMonth}
+          showPastMonths={true}
+          monthsRange={12}
+        />
+      </View>
 
       {/* Main Content */}
       {loading ? (
@@ -217,72 +169,10 @@ export default function Home() {
         </View>
       ) : (
         <View style={styles.contentContainer}>
-          {/* Valor Total e Limite */}
-          <View style={styles.valoresContainer}>
-            <View style={styles.valorBox}>
-              <Text style={styles.valorLabel}>Total Gasto</Text>
-              <Text style={[
-                styles.valorText,
-                { color: getStatusColor() }
-              ]}>
-                R$ {resumoMensal.totalDespesas.toFixed(2)}
-              </Text>
-            </View>
-            <View style={styles.valorBox}>
-              <Text style={styles.valorLabel}>Limite Mensal</Text>
-              <Text style={styles.valorText}>
-                R$ {parseFloat(resumoMensal.limite).toFixed(2)}
-              </Text>
-            </View>
-          </View>
-
-          {/* Barra de Progresso */}
-          <View style={styles.progressBarContainer}>
-            <View style={styles.progressBarBackground}>
-              <View 
-                style={[
-                  styles.progressBarFill,
-                  {
-                    width: `${calcularPorcentagem()}%`,
-                    backgroundColor: getStatusColor()
-                  }
-                ]} 
-              />
-            </View>
-            <Text style={[styles.progressStatus, { color: getStatusColor() }]}>
-              {calcularPorcentagem() >= 100 ? (
-                'Limite Excedido!'
-              ) : calcularPorcentagem() >= 80 ? (
-                'Atenção! Próximo ao limite'
-              ) : (
-                'Dentro do limite'
-              )}
-            </Text>
-            {calcularPorcentagem() < 80 && (
-              <View style={styles.motivationalContainer}>
-                <Text style={styles.emojiText}>😊</Text>
-                <Text style={[styles.motivationalText, { color: getStatusColor() }]}>
-                  Continue assim! Você está gerenciando bem seus gastos!
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Valor Disponível */}
-          <View style={styles.disponibilidadeContainer}>
-            <Text style={styles.disponibilidadeLabel}>
-              {resumoMensal.totalDespesas > resumoMensal.limite ? 
-                'Valor Excedido:' : 
-                'Valor Disponível:'
-              }
-            </Text>
-            <Text style={[
-              styles.disponibilidadeValor,
-              { color: getStatusColor() }
-            ]}>
-              R$ {Math.abs(resumoMensal.limite - resumoMensal.totalDespesas).toFixed(2)}
-            </Text>
-          </View>
+          <FinancialProgress
+            totalDespesas={resumoMensal.totalDespesas}
+            limite={resumoMensal.limite}
+          />
         </View>
       )}
 
@@ -347,16 +237,8 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginTop: 5,
   },
-  monthSelectorButton: {
-    backgroundColor: '#fff',
+  monthSelectorContainer: {
     margin: 20,
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  monthSelectorText: {
-    fontSize: 16,
-    color: '#333',
   },
   loadingContainer: {
     flex: 1,
@@ -400,72 +282,6 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 20,
     paddingBottom: 80,
-  },
-  valoresContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 30,
-    backgroundColor: '#2C2C2C',
-    padding: 20,
-    borderRadius: 15,
-    elevation: 5,
-  },
-  valorBox: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  valorLabel: {
-    color: '#888',
-    marginBottom: 8,
-    fontSize: 14,
-  },
-  valorText: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  progressBarContainer: {
-    marginBottom: 30,
-    backgroundColor: '#2C2C2C',
-    padding: 20,
-    borderRadius: 15,
-    elevation: 5,
-  },
-  progressBarBackground: {
-    height: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 10,
-    transition: 'width 0.5s ease-in-out',
-  },
-  progressStatus: {
-    color: '#fff',
-    fontSize: 14,
-    marginTop: 10,
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  disponibilidadeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#2C2C2C',
-    padding: 20,
-    borderRadius: 15,
-    elevation: 5,
-  },
-  disponibilidadeLabel: {
-    color: '#888',
-    fontSize: 14,
-  },
-  disponibilidadeValor: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
   },
   bottomNav: {
     flexDirection: 'row',
