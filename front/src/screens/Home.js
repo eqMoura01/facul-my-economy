@@ -6,32 +6,49 @@ import {
   TouchableOpacity,
   Dimensions,
   ActivityIndicator,
+  Platform,
+  Modal,
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useNavigation } from '@react-navigation/native';
-import { expenses } from '../services/api';
+import { expenses, auth } from '../services/api';
 
 export default function Home() {
   const [selectedMonth, setSelectedMonth] = useState('');
   const [loading, setLoading] = useState(false);
   const [resumoMensal, setResumoMensal] = useState(null);
+  const [userData, setUserData] = useState(null);
+  const [showPicker, setShowPicker] = useState(false);
   const navigation = useNavigation();
+
+  // Carregar dados do usuário ao iniciar
+  useEffect(() => {
+    carregarDadosUsuario();
+  }, []);
+
+  const carregarDadosUsuario = async () => {
+    try {
+      const response = await auth.perfil();
+      setUserData(response.data.data.usuario);
+    } catch (error) {
+      console.error('Erro ao carregar dados do usuário:', error);
+    }
+  };
 
   // Carregar dados do mês atual ao iniciar
   useEffect(() => {
     const dataAtual = new Date();
     const mesAtual = dataAtual.getMonth() + 1;
     const anoAtual = dataAtual.getFullYear();
-    setSelectedMonth(mesAtual.toString());
+    setSelectedMonth(`${mesAtual}-${anoAtual}`); // formato: "mes-ano"
     carregarDados(mesAtual, anoAtual);
   }, []);
 
   // Carregar dados quando mudar o mês selecionado
   useEffect(() => {
     if (selectedMonth) {
-      const dataAtual = new Date();
-      const anoAtual = dataAtual.getFullYear();
-      carregarDados(parseInt(selectedMonth), anoAtual);
+      const [mes, ano] = selectedMonth.split('-').map(Number);
+      carregarDados(mes, ano);
     }
   }, [selectedMonth]);
 
@@ -69,38 +86,117 @@ export default function Home() {
     return meses[mesNumero - 1];
   };
 
+  const getMesesComAno = () => {
+    const meses = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    const dataAtual = new Date();
+    const mesAtual = dataAtual.getMonth(); // 0-11
+    const anoAtual = dataAtual.getFullYear();
+    
+    let opcoes = [];
+    // Inclui 6 meses anteriores e 6 meses futuros
+    for (let i = -6; i <= 6; i++) {
+      let mes = mesAtual + i;
+      let ano = anoAtual;
+
+      // Ajusta o ano se necessário
+      while (mes < 0) {
+        mes += 12;
+        ano--;
+      }
+      while (mes >= 12) {
+        mes -= 12;
+        ano++;
+      }
+
+      opcoes.push({
+        label: `${meses[mes]}/${ano}`,
+        value: `${mes + 1}-${ano}` // formato: "mes-ano"
+      });
+    }
+    return opcoes;
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerText}>
-          Home - {selectedMonth ? getMesNome(parseInt(selectedMonth)) : 'Mês corrente'}
+          Home - {selectedMonth ? 
+            `${getMesNome(parseInt(selectedMonth.split('-')[0]))}/${selectedMonth.split('-')[1]}` : 
+            'Mês corrente'}
         </Text>
       </View>
 
       {/* Greeting Section */}
       <View style={styles.greetingContainer}>
-        <Text style={styles.greetingText}>Olá João 👋</Text>
+        <Text style={styles.greetingText}>Olá {userData ? userData.nome.split(' ')[0] : ''} 👋</Text>
         <Text style={styles.subText}>É bom te ver por aqui!</Text>
       </View>
 
-      {/* Month Picker */}
-      <View style={styles.pickerContainer}>
-        <Picker
-          selectedValue={selectedMonth}
-          onValueChange={(itemValue) => setSelectedMonth(itemValue)}
-          style={styles.picker}
-        >
-          <Picker.Item label="Selecione um mês" value="" />
-          {Array.from({ length: 12 }, (_, i) => (
-            <Picker.Item 
-              key={i + 1} 
-              label={getMesNome(i + 1)} 
-              value={(i + 1).toString()} 
-            />
-          ))}
-        </Picker>
-      </View>
+      {/* Month Selector Button */}
+      <TouchableOpacity 
+        style={styles.monthSelectorButton}
+        onPress={() => setShowPicker(true)}
+      >
+        <Text style={styles.monthSelectorText}>
+          {selectedMonth ? 
+            `${getMesNome(parseInt(selectedMonth.split('-')[0]))}/${selectedMonth.split('-')[1]}` : 
+            'Selecione um mês'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Month Picker Modal */}
+      <Modal
+        visible={showPicker}
+        transparent={true}
+        animationType="slide"
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.pickerContainer}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>Selecione o Mês</Text>
+              <TouchableOpacity 
+                style={styles.closeButton}
+                onPress={() => setShowPicker(false)}
+              >
+                <Text style={styles.closeButtonText}>Fechar</Text>
+              </TouchableOpacity>
+            </View>
+            <Picker
+              selectedValue={selectedMonth}
+              onValueChange={(itemValue) => {
+                setSelectedMonth(itemValue);
+                setShowPicker(false);
+                if (itemValue) {
+                  const [mes, ano] = itemValue.split('-').map(Number);
+                  carregarDados(mes, ano);
+                }
+              }}
+              style={styles.picker}
+              itemStyle={styles.pickerItem}
+              dropdownIconColor="#333"
+              mode="dropdown"
+            >
+              <Picker.Item 
+                label="Selecione um mês" 
+                value="" 
+                color="#333"
+              />
+              {getMesesComAno().map((item) => (
+                <Picker.Item 
+                  key={item.value} 
+                  label={item.label} 
+                  value={item.value}
+                  color="#333"
+                />
+              ))}
+            </Picker>
+          </View>
+        </View>
+      </Modal>
 
       {/* Main Content */}
       {loading ? (
@@ -109,7 +205,9 @@ export default function Home() {
         </View>
       ) : !resumoMensal || !resumoMensal.limite ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emojiText}>🎯</Text>
+          <Text style={styles.emojiText}>🤔</Text>
+          <Text style={styles.emptyText}>Progresso não encontrado</Text>
+          <Text style={styles.emptySubText}>Você ainda não definiu um limite mensal</Text>
           <TouchableOpacity 
             style={styles.continueButton}
             onPress={() => navigation.navigate('Limit')}
@@ -160,6 +258,14 @@ export default function Home() {
                 'Dentro do limite'
               )}
             </Text>
+            {calcularPorcentagem() < 80 && (
+              <View style={styles.motivationalContainer}>
+                <Text style={styles.emojiText}>😊</Text>
+                <Text style={[styles.motivationalText, { color: getStatusColor() }]}>
+                  Continue assim! Você está gerenciando bem seus gastos!
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Valor Disponível */}
@@ -241,13 +347,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginTop: 5,
   },
-  pickerContainer: {
+  monthSelectorButton: {
     backgroundColor: '#fff',
     margin: 20,
+    padding: 15,
     borderRadius: 8,
+    alignItems: 'center',
   },
-  picker: {
-    height: 50,
+  monthSelectorText: {
+    fontSize: 16,
+    color: '#333',
   },
   loadingContainer: {
     flex: 1,
@@ -258,10 +367,24 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 20,
   },
   emojiText: {
     fontSize: 50,
     marginBottom: 20,
+  },
+  emptyText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  emptySubText: {
+    color: '#888',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 30,
   },
   continueButton: {
     backgroundColor: '#4CAF50',
@@ -272,9 +395,11 @@ const styles = StyleSheet.create({
   continueText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: 'bold',
   },
   contentContainer: {
     padding: 20,
+    paddingBottom: 80,
   },
   valoresContainer: {
     flexDirection: 'row',
@@ -349,6 +474,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     borderTopLeftRadius: 15,
     borderTopRightRadius: 15,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0
   },
   navItem: {
     alignItems: 'center',
@@ -367,5 +496,57 @@ const styles = StyleSheet.create({
   },
   iconText: {
     fontSize: 20,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  pickerContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 15,
+    borderTopRightRadius: 15,
+    paddingBottom: 20,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  closeButton: {
+    padding: 5,
+  },
+  closeButtonText: {
+    color: '#4CAF50',
+    fontSize: 16,
+  },
+  picker: {
+    height: 50,
+    color: '#333', // Cor do texto do Picker
+  },
+  pickerItem: {
+    color: '#333', // Cor do texto dos itens do Picker
+    backgroundColor: '#fff', // Fundo dos itens
+  },
+  motivationalContainer: {
+    alignItems: 'center',
+    marginTop: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 15,
+    borderRadius: 10,
+  },
+  motivationalText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 10,
+    fontWeight: '500',
   },
 }); 

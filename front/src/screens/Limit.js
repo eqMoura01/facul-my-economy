@@ -23,6 +23,9 @@ export default function Limit({ navigation }) {
     const dataAtual = new Date();
     const mesAtual = dataAtual.getMonth() + 1;
     const anoAtual = dataAtual.getFullYear();
+    const mesAtualFormatado = `${getMesNome(mesAtual)}/${anoAtual}`;
+    setMesSelected(mesAtualFormatado);
+    setMesConsultaSelected(mesAtualFormatado);
     carregarDados(mesAtual, anoAtual);
   }, []);
 
@@ -76,13 +79,14 @@ export default function Limit({ navigation }) {
       'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
     ];
     const dataAtual = new Date();
-    const mesAtual = dataAtual.getMonth();
+    const mesAtual = dataAtual.getMonth(); // 0-11
     const anoAtual = dataAtual.getFullYear();
     
     let opcoesMeses = [];
-    for (let i = mesAtual; i < mesAtual + 12; i++) {
-      const mes = i % 12;
-      const ano = anoAtual + Math.floor(i / 12);
+    // Inclui o mês atual e os próximos 11 meses
+    for (let i = 0; i <= 11; i++) {
+      const mes = (mesAtual + i) % 12;
+      const ano = anoAtual + Math.floor((mesAtual + i) / 12);
       opcoesMeses.push(`${meses[mes]}/${ano}`);
     }
     return opcoesMeses;
