@@ -19,11 +19,22 @@ export default function Expenses({ navigation }) {
   const [historico, setHistorico] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  const getMesNome = (mesNumero) => {
+    const meses = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    return meses[mesNumero - 1];
+  };
+
   // Carregar despesas do mês atual ao iniciar
   useEffect(() => {
     const dataAtual = new Date();
     const mesAtual = dataAtual.getMonth() + 1;
     const anoAtual = dataAtual.getFullYear();
+    const mesAtualFormatado = `${getMesNome(mesAtual)}/${anoAtual}`;
+    setMesSelected(mesAtualFormatado);
+    setMesHistoricoSelected(mesAtualFormatado);
     carregarDespesas(mesAtual, anoAtual);
   }, []);
 
@@ -60,13 +71,14 @@ export default function Expenses({ navigation }) {
       'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
     ];
     const dataAtual = new Date();
-    const mesAtual = dataAtual.getMonth();
+    const mesAtual = dataAtual.getMonth(); // 0-11
     const anoAtual = dataAtual.getFullYear();
     
     let opcoesMeses = [];
-    for (let i = mesAtual; i < mesAtual + 12; i++) {
-      const mes = i % 12;
-      const ano = anoAtual + Math.floor(i / 12);
+    // Inclui o mês atual e os próximos 11 meses
+    for (let i = 0; i <= 11; i++) {
+      const mes = (mesAtual + i) % 12;
+      const ano = anoAtual + Math.floor((mesAtual + i) / 12);
       opcoesMeses.push(`${meses[mes]}/${ano}`);
     }
     return opcoesMeses;
@@ -88,7 +100,9 @@ export default function Expenses({ navigation }) {
         'Setembro': 9, 'Outubro': 10, 'Novembro': 11, 'Dezembro': 12
       };
 
-      const data = new Date(parseInt(ano), meses[mes] - 1, 1);
+      // Pega o dia atual para manter no mesmo mês
+      const dataAtual = new Date();
+      const data = new Date(parseInt(ano), meses[mes] - 1, dataAtual.getDate());
       
       await expenses.criar({
         descricao: descricao.trim(),
@@ -204,7 +218,9 @@ export default function Expenses({ navigation }) {
           </View>
         ) : historico.length === 0 ? (
           <View style={styles.emptyContainer}>
+            <Text style={styles.emojiText}>🤔</Text>
             <Text style={styles.emptyText}>Nenhuma despesa encontrada</Text>
+            <Text style={styles.emptySubText}>Comece adicionando sua primeira despesa</Text>
           </View>
         ) : (
           historico.map((item) => (
@@ -421,12 +437,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   emptyContainer: {
-    padding: 20,
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 30,
+  },
+  emojiText: {
+    fontSize: 50,
+    marginBottom: 20,
   },
   emptyText: {
     color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  emptySubText: {
+    color: '#888',
     fontSize: 16,
     textAlign: 'center',
   },
