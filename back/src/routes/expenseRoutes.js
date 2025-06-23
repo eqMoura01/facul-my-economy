@@ -14,6 +14,17 @@ router.post('/limite', protect, async (req, res) => {
   }
 });
 
+// Excluir limite mensal
+router.delete('/limite/:id', protect, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await expenseService.excluirLimiteMensal(req.usuario.email, id);
+    res.status(204).json({ status: 'sucesso', mensagem: 'Limite excluído com sucesso' });
+  } catch (error) {
+    res.status(400).json({ status: 'erro', mensagem: error.message });
+  }
+});
+
 // Adicionar despesa
 router.post('/despesa', protect, async (req, res) => {
   try {
@@ -25,6 +36,34 @@ router.post('/despesa', protect, async (req, res) => {
       categoria
     });
     res.json(despesa);
+  } catch (error) {
+    res.status(400).json({ status: 'erro', mensagem: error.message });
+  }
+});
+
+// Editar despesa
+router.put('/despesa/:id', protect, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { descricao, valor, data, categoria } = req.body;
+    const despesa = await expenseService.editarDespesa(req.usuario.email, id, {
+      descricao,
+      valor,
+      data,
+      categoria
+    });
+    res.json(despesa);
+  } catch (error) {
+    res.status(400).json({ status: 'erro', mensagem: error.message });
+  }
+});
+
+// Excluir despesa
+router.delete('/despesa/:id', protect, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await expenseService.excluirDespesa(req.usuario.email, id);
+    res.status(204).json({ status: 'sucesso', mensagem: 'Despesa excluída com sucesso' });
   } catch (error) {
     res.status(400).json({ status: 'erro', mensagem: error.message });
   }
