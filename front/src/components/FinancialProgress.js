@@ -8,33 +8,66 @@ import {
 export default function FinancialProgress({ 
   totalDespesas, 
   limite,
+  mes,
+  ano,
   showMotivational = true
 }) {
+  const isMonthFinished = () => {
+    if (!mes || !ano) return false;
+    
+    const dataAtual = new Date();
+    const mesAtual = dataAtual.getMonth() + 1;
+    const anoAtual = dataAtual.getFullYear();
+    
+    return (ano < anoAtual) || (ano === anoAtual && mes < mesAtual);
+  };
+
+  const savedMoney = () => {
+    return limite > 0 && totalDespesas < limite;
+  };
+
   const calcularPorcentagem = () => {
     if (!limite) return 0;
     const porcentagem = ((totalDespesas / limite) * 100);
-    return Math.min(100, porcentagem); // Limita a 100% mesmo se ultrapassar
+    return Math.min(100, porcentagem); //Limita a 100% mesmo se ultrapassar
   };
 
   const getStatusColor = () => {
     if (!limite) return '#888';
     const porcentagem = (totalDespesas / limite) * 100;
-    if (porcentagem >= 100) return '#FF5252'; // Vermelho
-    if (porcentagem >= 80) return '#FFA726'; // Laranja
-    return '#4CAF50'; // Verde
+    if (porcentagem >= 100) return '#FF5252'; //Vermelho
+    if (porcentagem >= 80) return '#FFA726'; //Laranja
+    return '#4CAF50'; //Verde
   };
 
   const getStatusEmoji = () => {
-    const porcentagem = calcularPorcentagem();
-    if (porcentagem >= 100) return '😡';
-    if (porcentagem >= 80) return '😰';
-    return '😊';
+    if (!limite) return '🤔'; //Sem limite definido
+    
+    if (isMonthFinished() && savedMoney()) {
+      return '😄'; //Sorrindo bem grande
+    }
+    
+    const porcentagem = (totalDespesas / limite) * 100;
+    
+    if (porcentagem >= 100) return '😡'; //Limite excedido
+    if (porcentagem >= 90) return '🤩'; //Limite quase batido (sorrindo com estrela)
+    if (porcentagem >= 70) return '😰'; //Atenção, próximo ao limite
+    return '😊'; //Abaixo do limite, tudo bem
   };
 
   const getStatusMessage = () => {
-    const porcentagem = calcularPorcentagem();
+    if (!limite) return 'Defina um limite para acompanhar seus gastos!';
+    
+    if (isMonthFinished() && savedMoney()) {
+      const valorEconomizado = limite - totalDespesas;
+      return `Parabéns! Você economizou R$ ${valorEconomizado.toFixed(2)} este mês! 🎉`;
+    }
+    
+    const porcentagem = (totalDespesas / limite) * 100;
+    
     if (porcentagem >= 100) return 'Limite Excedido! Hora de controlar os gastos!';
-    if (porcentagem >= 80) return 'Atenção! Você está próximo ao limite!';
+    if (porcentagem >= 90) return 'Quase no limite! Você está se saindo muito bem!';
+    if (porcentagem >= 70) return 'Atenção! Você está próximo ao limite!';
     return 'Continue assim! Você está gerenciando bem seus gastos!';
   };
 
@@ -75,9 +108,17 @@ export default function FinancialProgress({
         <Text style={[styles.progressStatus, { color: getStatusColor() }]}>
           {calcularPorcentagem().toFixed(1)}% utilizado
         </Text>
-        <View style={styles.statusContainer}>
+        <View style={[
+          styles.statusContainer,
+          isMonthFinished() && savedMoney() && styles.successContainer
+        ]}>
           <Text style={styles.emojiText}>{getStatusEmoji()}</Text>
-          <Text style={[styles.statusMessage, { color: getStatusColor() }]}>
+          <Text style={[
+            styles.statusMessage, 
+            { 
+              color: isMonthFinished() && savedMoney() ? '#4CAF50' : getStatusColor() 
+            }
+          ]}>
             {getStatusMessage()}
           </Text>
         </View>
@@ -86,7 +127,8 @@ export default function FinancialProgress({
       {/* Valor Disponível */}
       <View style={styles.disponibilidadeContainer}>
         <Text style={styles.disponibilidadeLabel}>
-          {totalDespesas > limite ? 'Valor Excedido:' : 'Valor Disponível:'}
+          {isMonthFinished() && savedMoney() ? 'Valor Economizado:' :
+           totalDespesas > limite ? 'Valor Excedido:' : 'Valor Disponível:'}
         </Text>
         <Text style={[
           styles.disponibilidadeValor,
@@ -157,6 +199,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     padding: 15,
     borderRadius: 10,
+  },
+  successContainer: {
+    backgroundColor: 'rgba(76, 175, 80, 0.2)', //Verde claro para sucesso
+    borderWidth: 2,
+    borderColor: '#4CAF50',
   },
   emojiText: {
     fontSize: 40,

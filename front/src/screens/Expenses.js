@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { expenses } from '../services/api';
 import DatePicker from '../components/DatePicker';
+import EditExpenseModal from '../components/EditExpenseModal';
 import { useExpense } from '../contexts/ExpenseContext';
 
 export default function Expenses({ navigation }) {
@@ -19,6 +20,11 @@ export default function Expenses({ navigation }) {
   const [mesHistoricoSelected, setMesHistoricoSelected] = useState('');
   const [historico, setHistorico] = useState([]);
   const [loading, setLoading] = useState(false);
+  
+  //Estados para o modal de edição
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [despesaParaEditar, setDespesaParaEditar] = useState(null);
+  
   const { triggerRefresh } = useExpense();
 
   const getMesNome = (mesNumero) => {
@@ -29,7 +35,20 @@ export default function Expenses({ navigation }) {
     return meses[mesNumero - 1];
   };
 
-  // Carregar despesas do mês atual ao iniciar
+  //Verificar se é mês passado (para desabilitar botões)
+  const isPastMonth = (data) => {
+    const dataExpense = new Date(data);
+    const mesExpense = dataExpense.getMonth() + 1;
+    const anoExpense = dataExpense.getFullYear();
+    
+    const dataAtual = new Date();
+    const mesAtual = dataAtual.getMonth() + 1;
+    const anoAtual = dataAtual.getFullYear();
+    
+    return (anoExpense < anoAtual) || (anoExpense === anoAtual && mesExpense < mesAtual);
+  };
+
+  //Carregar despesas do mês atual ao iniciar
   useEffect(() => {
     const dataAtual = new Date();
     const mesAtual = dataAtual.getMonth() + 1;
@@ -40,7 +59,7 @@ export default function Expenses({ navigation }) {
     carregarDespesas(mesAtual, anoAtual);
   }, []);
 
-  // Carregar despesas quando mudar o mês selecionado no histórico
+  //Carregar despesas quando mudar o mês selecionado no histórico
   useEffect(() => {
     if (mesHistoricoSelected) {
       const [mes, ano] = mesHistoricoSelected.split('-').map(Number);
@@ -72,7 +91,7 @@ export default function Expenses({ navigation }) {
       const valorNumerico = parseFloat(valor.replace('R$ ', '').replace(',', '.'));
       const [mes, ano] = mesSelected.split('-').map(Number);
 
-      // Pega o dia atual para manter no mesmo mês
+      //Pega o dia atual para manter no mesmo mês
       const dataAtual = new Date();
       const data = new Date(parseInt(ano), mes - 1, dataAtual.getDate());
       
@@ -80,7 +99,7 @@ export default function Expenses({ navigation }) {
         descricao: descricao.trim(),
         valor: valorNumerico,
         data: data.toISOString().split('T')[0],
-        categoria: 'Geral' // Por enquanto vamos usar uma categoria padrão
+        categoria: 'Geral' //Por enquanto vamos usar uma categoria padrão
       });
 
       Alert.alert('Sucesso', 'Despesa salva com sucesso!');
@@ -88,27 +107,97 @@ export default function Expenses({ navigation }) {
       setValor('');
       setMesSelected('');
 
-      // Recarrega as despesas do mês selecionado
+      //Recarrega as despesas do mês selecionado
       if (mesHistoricoSelected) {
         const [mesHist, anoHist] = mesHistoricoSelected.split('-').map(Number);
         carregarDespesas(mesHist, anoHist);
       }
 
-      // Notifica outras telas para atualizar
+      //Notifica outras telas para atualizar
       triggerRefresh();
     } catch (error) {
-      Alert.alert('Erro', 'Não foi possível salvar a despesa');
+      Alert.alert('Erro', error.mensagem || 'Não foi possível salvar a despesa');
       console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
+  //Abrir modal de edição
+  const handleEditar = (despesa) => {
+    if (isPastMonth(despesa.data)) {
+      Alert.alert('Aviso', 'Não é possível editar despesas de meses passados');
+      return;
+    }
+    setDespesaParaEditar(despesa);
+    setEditModalVisible(true);
+  };
+
+  //Salvar edição da despesa
+  const handleSalvarEdicao = async (id, dadosAtualizados) => {
+    try {
+      await expenses.editar(id, dadosAtualizados);
+      Alert.alert('Sucesso', 'Despesa editada com sucesso!');
+      
+      //Recarregar despesas
+      if (mesHistoricoSelected) {
+        const [mesHist, anoHist] = mesHistoricoSelected.split('-').map(Number);
+        carregarDespesas(mesHist, anoHist);
+      }
+      
+      //Notificar outras telas
+      triggerRefresh();
+    } catch (error) {
+      Alert.alert('Erro', error.mensagem || 'Não foi possível editar a despesa');
+      throw error;
+    }
+  };
+
+  //Excluir despesa
+  const handleExcluir = (despesa) => {
+    if (isPastMonth(despesa.data)) {
+      Alert.alert('Aviso', 'Não é possível excluir despesas de meses passados');
+      return;
+    }
+
+    Alert.alert(
+      'Confirmar Exclusão',
+      `Deseja realmente excluir a despesa "${despesa.descricao}"?`,
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await expenses.excluir(despesa.id);
+              Alert.alert('Sucesso', 'Despesa excluída com sucesso!');
+              
+              //Recarregar despesas
+              if (mesHistoricoSelected) {
+                const [mesHist, anoHist] = mesHistoricoSelected.split('-').map(Number);
+                carregarDespesas(mesHist, anoHist);
+              }
+              
+              //Notificar outras telas
+              triggerRefresh();
+            } catch (error) {
+              Alert.alert('Erro', error.mensagem || 'Não foi possível excluir a despesa');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const formatarValor = (text) => {
-    // Remove tudo que não é número
+    //Remove tudo que não é número
     const numerico = text.replace(/[^0-9]/g, '');
     
-    // Converte para formato de moeda
+    //Converte para formato de moeda
     if (numerico) {
       const valor = (parseInt(numerico) / 100).toFixed(2);
       return `R$ ${valor}`;
@@ -187,30 +276,58 @@ export default function Expenses({ navigation }) {
             <Text style={styles.emptySubText}>Comece adicionando sua primeira despesa</Text>
           </View>
         ) : (
-          historico.map((item) => (
-            <View key={item.id} style={styles.historicoItem}>
-              <View style={styles.historicoInfo}>
-                <Text style={styles.historicoDescricao}>{item.descricao}</Text>
-                <Text style={styles.historicoValor}>R$ {parseFloat(item.valor).toFixed(2)}</Text>
-                <Text style={styles.historicoMes}>
-                  {new Date(item.data).toLocaleDateString('pt-BR', {
-                    month: 'long',
-                    year: 'numeric'
-                  })}
-                </Text>
+          historico.map((item) => {
+            const isPassado = isPastMonth(item.data);
+            return (
+              <View key={item.id} style={styles.historicoItem}>
+                <View style={styles.historicoInfo}>
+                  <Text style={styles.historicoDescricao}>{item.descricao}</Text>
+                  <Text style={styles.historicoValor}>R$ {parseFloat(item.valor).toFixed(2)}</Text>
+                  <Text style={styles.historicoMes}>
+                    {new Date(item.data).toLocaleDateString('pt-BR', {
+                      month: 'long',
+                      year: 'numeric'
+                    })}
+                  </Text>
+                </View>
+                <View style={styles.historicoAcoes}>
+                  <TouchableOpacity 
+                    style={[
+                      styles.editButton,
+                      isPassado && styles.disabledButton
+                    ]}
+                    onPress={() => handleEditar(item)}
+                    disabled={isPassado}
+                  >
+                    <Text style={styles.actionButtonText}>✏️</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[
+                      styles.deleteButton,
+                      isPassado && styles.disabledButton
+                    ]}
+                    onPress={() => handleExcluir(item)}
+                    disabled={isPassado}
+                  >
+                    <Text style={styles.actionButtonText}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-              <View style={styles.historicoAcoes}>
-                <TouchableOpacity style={styles.editButton}>
-                  <Text style={styles.actionButtonText}>✏️</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.deleteButton}>
-                  <Text style={styles.actionButtonText}>🗑️</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
+
+      {/* Modal de Edição */}
+      <EditExpenseModal
+        visible={editModalVisible}
+        expense={despesaParaEditar}
+        onClose={() => {
+          setEditModalVisible(false);
+          setDespesaParaEditar(null);
+        }}
+        onSave={handleSalvarEdicao}
+      />
 
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
@@ -414,5 +531,8 @@ const styles = StyleSheet.create({
     color: '#888',
     fontSize: 16,
     textAlign: 'center',
+  },
+  disabledButton: {
+    backgroundColor: '#888',
   },
 }); 

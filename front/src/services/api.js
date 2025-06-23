@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL, TOKEN_KEY } from '../config/env';
 
-// Criar instância do Axios com configurações base
+//Criar instância do Axios com configurações base
 const api = axios.create({
   baseURL: API_URL,
   headers: {
@@ -10,7 +10,7 @@ const api = axios.create({
   },
 });
 
-// Interceptor para adicionar o token em todas as requisições
+//Interceptor para adicionar o token em todas as requisições
 api.interceptors.request.use(
   async (config) => {
     try {
@@ -28,26 +28,26 @@ api.interceptors.request.use(
   }
 );
 
-// Interceptor para tratamento de erros nas respostas
+//Interceptor para tratamento de erros nas respostas
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response) {
-      // Erro do servidor com resposta
+      //Erro do servidor com resposta
       if (error.response.status === 401) {
-        // Token inválido ou expirado
+        //Token inválido ou expirado
         await AsyncStorage.removeItem(TOKEN_KEY);
-        // Aqui você pode adicionar lógica para redirecionar para a tela de login
+        //Aqui você pode adicionar lógica para redirecionar para a tela de login
       }
       return Promise.reject(error.response.data);
     } else if (error.request) {
-      // Erro sem resposta do servidor
+      //Erro sem resposta do servidor
       return Promise.reject({
         status: 'erro',
         mensagem: 'Não foi possível conectar ao servidor. Verifique sua conexão.'
       });
     } else {
-      // Erro na configuração da requisição
+      //Erro na configuração da requisição
       return Promise.reject({
         status: 'erro',
         mensagem: 'Erro ao processar a requisição.'
@@ -58,26 +58,35 @@ api.interceptors.response.use(
 
 // Funções de API
 
-// Autenticação
+//Autenticação
 export const auth = {
   login: (email, senha) => api.post('/usuarios/login', { email, senha }),
   registro: (dados) => api.post('/usuarios/registro', dados),
   perfil: () => api.get('/usuarios/me'),
 };
 
-// Despesas
+//Despesas
 export const expenses = {
-  // Criar nova despesa
+  //Criar nova despesa
   criar: (dados) => api.post('/expenses/despesa', dados),
   
-  // Listar despesas do mês
+  //Editar despesa
+  editar: (id, dados) => api.put(`/expenses/despesa/${id}`, dados),
+  
+  //Excluir despesa
+  excluir: (id) => api.delete(`/expenses/despesa/${id}`),
+  
+  //Listar despesas do mês
   listarPorMes: (mes, ano) => api.get(`/expenses/resumo/${mes}/${ano}`),
 };
 
-// Limites
+//Limites
 export const limits = {
-  // Definir limite mensal
+  //Definir limite mensal (criar/editar)
   definir: (mes, ano, valor) => api.post('/expenses/limite', { mes, ano, valor }),
+  
+  //Excluir limite mensal
+  excluir: (id) => api.delete(`/expenses/limite/${id}`),
 };
 
 export default api; 

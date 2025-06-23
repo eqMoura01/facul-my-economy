@@ -19,7 +19,7 @@ export default function Register({ navigation }) {
   const [confirmarSenha, setConfirmarSenha] = useState('');
 
   const handleRegister = async () => {
-    // Validações
+    //Validações
     if (!nome.trim() || !email.trim() || !dataNascimento.trim() || !senha || !confirmarSenha) {
       Alert.alert('Erro', 'Por favor, preencha todos os campos');
       return;
@@ -30,7 +30,7 @@ export default function Register({ navigation }) {
       return;
     }
 
-    // Validar formato da data
+    //Validar formato da data
     if (dataNascimento.length !== 10) {
       Alert.alert('Erro', 'Data de nascimento inválida');
       return;
@@ -59,10 +59,10 @@ export default function Register({ navigation }) {
   };
 
   const formatDate = (text) => {
-    // Remove qualquer caractere que não seja número
+    //Remove qualquer caractere que não seja número
     const numbers = text.replace(/\D/g, '');
     
-    // Adiciona as barras automaticamente
+    //Adiciona as barras automaticamente
     if (numbers.length <= 2) {
       return numbers;
     } else if (numbers.length <= 4) {
@@ -73,7 +73,7 @@ export default function Register({ navigation }) {
   };
 
   const formatDateToAPI = (date) => {
-    // Converte de DD/MM/YYYY para YYYY-MM-DD
+    //Converte de DD/MM/YYYY para YYYY-MM-DD
     const [day, month, year] = date.split('/');
     return `${year}-${month}-${day}`;
   };

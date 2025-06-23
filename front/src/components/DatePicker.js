@@ -12,7 +12,7 @@ export default function DatePicker({
   selectedDate, 
   onDateChange, 
   label = "Selecione o Mês",
-  showPastMonths = false, // Se true, mostra meses passados
+  showPastMonths = false, //Se true, mostra meses passados
   monthsRange = 12 // Quantidade de meses para mostrar
 }) {
   const [showModal, setShowModal] = useState(false);
@@ -43,7 +43,7 @@ export default function DatePicker({
       let mes = (mesAtual + i);
       let ano = anoAtual;
 
-      // Ajusta o ano se necessário
+      //Ajusta o ano se necessário
       while (mes < 0) {
         mes += 12;
         ano--;

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { limits, expenses } from '../services/api';
 import DatePicker from '../components/DatePicker';
+import { useExpense } from '../contexts/ExpenseContext';
 
 export default function Limit({ navigation }) {
   const [valor, setValor] = useState('');
@@ -17,8 +18,20 @@ export default function Limit({ navigation }) {
   const [mesConsultaSelected, setMesConsultaSelected] = useState('');
   const [historico, setHistorico] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const { triggerRefresh } = useExpense();
 
-  // Carregar dados do mês atual ao iniciar
+  //Verificar se é mês passado
+  const isPastMonth = (mes, ano) => {
+    const dataAtual = new Date();
+    const mesAtual = dataAtual.getMonth() + 1;
+    const anoAtual = dataAtual.getFullYear();
+    
+    return (ano < anoAtual) || (ano === anoAtual && mes < mesAtual);
+  };
+
+  //Carregar dados do mês atual ao iniciar
   useEffect(() => {
     const dataAtual = new Date();
     const mesAtual = dataAtual.getMonth() + 1;
@@ -29,7 +42,7 @@ export default function Limit({ navigation }) {
     carregarDados(mesAtual, anoAtual);
   }, []);
 
-  // Carregar dados quando mudar o mês selecionado na consulta
+  //Carregar dados quando mudar o mês selecionado na consulta
   useEffect(() => {
     if (mesConsultaSelected) {
       const [mes, ano] = mesConsultaSelected.split('-').map(Number);
@@ -44,8 +57,11 @@ export default function Limit({ navigation }) {
       if (response.data.limite) {
         setHistorico([{
           id: `${mes}-${ano}`,
+          limiteId: response.data.limiteId, //Precisamos do ID real do limite
           valor: response.data.limite,
-          mes: `${getMesNome(mes)}/${ano}`,
+          mes: mes,
+          ano: ano,
+          mesFormatado: `${getMesNome(mes)}/${ano}`,
           status: response.data.status
         }]);
       } else {
@@ -80,21 +96,89 @@ export default function Limit({ navigation }) {
 
       await limits.definir(mes, ano, valorNumerico);
       
-      Alert.alert('Sucesso', 'Limite salvo com sucesso!');
+      const mensagem = isEditMode ? 'Limite editado com sucesso!' : 'Limite salvo com sucesso!';
+      Alert.alert('Sucesso', mensagem);
+      
+      // Limpar formulário e sair do modo de edição
       setValor('');
       setMesSelected('');
+      setIsEditMode(false);
+      setEditingItem(null);
 
-      // Recarrega os dados do mês selecionado na consulta
+      // Disparar refresh para outras telas
+      console.log('Limit: Disparando refresh para outras telas');
+      triggerRefresh();
+
+      //Recarrega os dados do mês selecionado na consulta
       if (mesConsultaSelected) {
         const [mesConsulta, anoConsulta] = mesConsultaSelected.split('-').map(Number);
         carregarDados(mesConsulta, anoConsulta);
       }
     } catch (error) {
-      Alert.alert('Erro', 'Não foi possível salvar o limite');
+      Alert.alert('Erro', error.mensagem || 'Não foi possível salvar o limite');
       console.error(error);
     } finally {
       setLoading(false);
     }
+  };
+
+  //Editar limite (reutiliza o formulário principal)
+  const handleEditar = (item) => {
+    if (isPastMonth(item.mes, item.ano)) {
+      Alert.alert('Aviso', 'Não é possível editar limites de meses passados');
+      return;
+    }
+    
+    setMesSelected(item.id);
+    setValor(`R$ ${parseFloat(item.valor).toFixed(2)}`);
+    setIsEditMode(true);
+    setEditingItem(item);
+  };
+
+  //Excluir limite
+  const handleExcluir = (item) => {
+    if (isPastMonth(item.mes, item.ano)) {
+      Alert.alert('Aviso', 'Não é possível excluir limites de meses passados');
+      return;
+    }
+
+    Alert.alert(
+      'Confirmar Exclusão',
+      `Deseja realmente excluir o limite de ${item.mesFormatado}?`,
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              //Aqui precisamos do ID real do limite, não o composto
+              //Por enquanto vou usar uma abordagem diferente
+              await limits.excluir(item.limiteId);
+              Alert.alert('Sucesso', 'Limite excluído com sucesso!');
+              
+              // Disparar refresh para outras telas
+              console.log('Limit: Disparando refresh após exclusão');
+              triggerRefresh();
+              
+              //Recarregar dados
+              if (mesConsultaSelected) {
+                const [mesConsulta, anoConsulta] = mesConsultaSelected.split('-').map(Number);
+                carregarDados(mesConsulta, anoConsulta);
+              }
+            } catch (error) {
+              Alert.alert('Erro', error.mensagem || 'Não foi possível excluir o limite');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const formatarValor = (text) => {
@@ -142,9 +226,23 @@ export default function Limit({ navigation }) {
           disabled={loading}
         >
           <Text style={styles.saveButtonText}>
-            {loading ? 'SALVANDO...' : 'SALVAR'}
+            {loading ? 'SALVANDO...' : (isEditMode ? 'SALVAR ALTERAÇÕES' : 'SALVAR')}
           </Text>
         </TouchableOpacity>
+
+        {isEditMode && (
+          <TouchableOpacity 
+            style={styles.cancelButton} 
+            onPress={() => {
+              setValor('');
+              setMesSelected('');
+              setIsEditMode(false);
+              setEditingItem(null);
+            }}
+          >
+            <Text style={styles.cancelButtonText}>CANCELAR</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <Text style={styles.consultaTitle}>Consulta</Text>
@@ -168,35 +266,49 @@ export default function Limit({ navigation }) {
               <Text style={styles.emptyText}>Nenhum limite definido</Text>
             </View>
           ) : (
-            historico.map((item) => (
-              <View key={item.id} style={styles.historicoItem}>
-                <View style={styles.historicoInfo}>
-                  <Text style={styles.historicoValor}>R$ {parseFloat(item.valor).toFixed(2)}</Text>
-                  <Text style={styles.historicoMes}>{item.mes}</Text>
-                  <Text style={[
-                    styles.historicoStatus,
-                    item.status === 'abaixo_limite' && styles.statusAbaixo,
-                    item.status === 'acima_limite' && styles.statusAcima,
-                    item.status === 'sem_limite' && styles.statusSemLimite
-                  ]}>
-                    {item.status === 'abaixo_limite' ? 'Abaixo do limite' :
-                     item.status === 'acima_limite' ? 'Acima do limite' :
-                     'Sem despesas'}
-                  </Text>
+            historico.map((item) => {
+              const isPassado = isPastMonth(item.mes, item.ano);
+              return (
+                <View key={item.id} style={styles.historicoItem}>
+                  <View style={styles.historicoInfo}>
+                    <Text style={styles.historicoValor}>R$ {parseFloat(item.valor).toFixed(2)}</Text>
+                    <Text style={styles.historicoMes}>{item.mesFormatado}</Text>
+                    <Text style={[
+                      styles.historicoStatus,
+                      item.status === 'abaixo_limite' && styles.statusAbaixo,
+                      item.status === 'acima_limite' && styles.statusAcima,
+                      item.status === 'sem_limite' && styles.statusSemLimite
+                    ]}>
+                      {item.status === 'abaixo_limite' ? 'Abaixo do limite' :
+                       item.status === 'acima_limite' ? 'Acima do limite' :
+                       'Sem despesas'}
+                    </Text>
+                  </View>
+                  <View style={styles.historicoAcoes}>
+                    <TouchableOpacity 
+                      style={[
+                        styles.editButton,
+                        isPassado && styles.disabledButton
+                      ]}
+                      onPress={() => handleEditar(item)}
+                      disabled={isPassado}
+                    >
+                      <Text style={styles.actionButtonText}>EDITAR</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={[
+                        styles.deleteButton,
+                        isPassado && styles.disabledButton
+                      ]}
+                      onPress={() => handleExcluir(item)}
+                      disabled={isPassado}
+                    >
+                      <Text style={styles.actionButtonText}>EXCLUIR</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={styles.historicoAcoes}>
-                  <TouchableOpacity 
-                    style={styles.editButton}
-                    onPress={() => {
-                      setMesSelected(item.id);
-                      setValor(`R$ ${parseFloat(item.valor).toFixed(2)}`);
-                    }}
-                  >
-                    <Text style={styles.actionButtonText}>EDITAR</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
+              );
+            })
           )}
         </ScrollView>
       </View>
@@ -285,6 +397,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  cancelButton: {
+    backgroundColor: '#FF5252',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  cancelButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   consultaTitle: {
     fontSize: 18,
     color: '#fff',
@@ -341,6 +465,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     padding: 8,
     borderRadius: 4,
+  },
+  deleteButton: {
+    backgroundColor: '#FF5252',
+    padding: 8,
+    borderRadius: 4,
+  },
+  disabledButton: {
+    backgroundColor: '#888',
   },
   actionButtonText: {
     color: '#fff',

@@ -23,7 +23,7 @@ export default function Profile({ navigation }) {
       const response = await auth.perfil();
       const { usuario } = response.data.data;
       
-      // Formatando a data de nascimento
+      //Formatando a data de nascimento
       const data = new Date(usuario.data_nascimento);
       const dataFormatada = data.toLocaleDateString('pt-BR');
       
@@ -36,7 +36,7 @@ export default function Profile({ navigation }) {
         "Erro",
         error.mensagem || "Não foi possível carregar os dados do usuário"
       );
-      // Se o erro for de autenticação, redireciona para o login
+      //Se o erro for de autenticação, redireciona para o login
       if (error.status === 401) {
         navigation.reset({
           index: 0,

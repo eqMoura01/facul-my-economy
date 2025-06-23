@@ -51,6 +51,7 @@ export default function Home() {
   // Carregar dados quando mudar o mês selecionado ou quando houver atualização
   useEffect(() => {
     if (selectedMonth) {
+      console.log('Home: Carregando dados devido ao refresh ou mudança de mês');
       const [mes, ano] = selectedMonth.split('-').map(Number);
       carregarDados(mes, ano);
     }
@@ -59,10 +60,12 @@ export default function Home() {
   const carregarDados = async (mes, ano) => {
     try {
       setLoading(true);
+      console.log(`Home: Carregando dados para ${mes}/${ano}`);
       const response = await expenses.listarPorMes(mes, ano);
+      console.log('Home: Resposta da API:', response.data);
       setResumoMensal(response.data);
     } catch (error) {
-      console.error(error);
+      console.error('Home: Erro ao carregar dados:', error);
     } finally {
       setLoading(false);
     }
@@ -125,15 +128,6 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerText}>
-          Home - {selectedMonth ? 
-            `${getMesNome(parseInt(selectedMonth.split('-')[0]))}/${selectedMonth.split('-')[1]}` : 
-            'Mês corrente'}
-        </Text>
-      </View>
-
       {/* Greeting Section */}
       <View style={styles.greetingContainer}>
         <Text style={styles.greetingText}>Olá {userData ? userData.nome.split(' ')[0] : ''} 👋</Text>
@@ -172,6 +166,8 @@ export default function Home() {
           <FinancialProgress
             totalDespesas={resumoMensal.totalDespesas}
             limite={resumoMensal.limite}
+            mes={parseInt(selectedMonth.split('-')[0])}
+            ano={parseInt(selectedMonth.split('-')[1])}
           />
         </View>
       )}
@@ -227,6 +223,7 @@ const styles = StyleSheet.create({
   },
   greetingContainer: {
     padding: 20,
+    paddingTop: 40,
   },
   greetingText: {
     color: '#fff',

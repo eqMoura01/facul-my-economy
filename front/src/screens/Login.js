@@ -25,10 +25,10 @@ export default function Login({ navigation }) {
       const response = await auth.login(email, senha);
       const { token, data } = response.data;
 
-      // Salvar o token
+      //Salvar o token
       await AsyncStorage.setItem(TOKEN_KEY, token);
 
-      // Navegar para a Home
+      //Navegar para a Home
       navigation.reset({
         index: 0,
         routes: [{ name: 'Home' }],
